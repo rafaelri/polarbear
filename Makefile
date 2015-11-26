@@ -121,8 +121,7 @@ clean:
 
 # Simple tester
 test: all Test.class
-	rm -f /tmp/oom.log
-	LD_LIBRARY_PATH=`pwd` $(J2SDK)/bin/java -Xms50m -Xmx50m -agentlib:$(LIBNAME)=HashMap,OOMList Test || cat '/tmp/oom.log'
+	LD_LIBRARY_PATH=`pwd` $(J2SDK)/bin/java -Xms1m -Xmx1m -agentlib:$(LIBNAME)=time=10,count=1 JvmKillTestThreads
 
 # Compilation rule only needed on Windows
 ifeq ($(OSNAME), win32)

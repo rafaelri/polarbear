@@ -43,25 +43,49 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
-#include "jni.h"
-#include "jvmti.h"
-
+#include "outOfMemory.h"
 #include "base.h"
 #include "memory.h"
 #include "threads.h"
 
+enum {
+    TIME_OPT = 0,
+    COUNT_OPT = 1,
+    DUMPHEAP_OPT = 3,
+    DUMPTHREADS_OPT = 4,
+    ANALYZECLASSES_OPT = 5
+};
+ 
+char *tokens[] = {
+    "time",
+    "count",
+    "dumpHeap",
+    "dumpThreads",
+    "analyzeClasses"
+};
 
-/* Called when memory is exhausted. */
-static void JNICALL resourceExhausted(
-    jvmtiEnv *jvmti, JNIEnv* jni, jint flags, const void* reserved, const char* description) {
-    enterAgentMonitor(jvmti); {
+
+
+static time_t currentTimestamp;
+static int count;
+
+static void thresholdReached(jvmtiEnv *jvmti, JNIEnv* jni) {
+//    enterAgentMonitor(jvmti); {
       std::cout << "About to throw an OutOfMemory error.\n";
+
+      std::cout << "Printing thread dump.\n";
+
+//      ThreadSuspension threads(jvmti);
+
+      printThreadDump(jvmti, &std::cout);
 
       std::cout << "Suspending all threads except the current one.\n";
 
-      ThreadSuspension threads(jvmti, jni);
+      //threads.suspend();
+
 
       std::cout << "Printing a heap histogram.\n";
 
@@ -69,44 +93,52 @@ static void JNICALL resourceExhausted(
 
       std::cout << "Resuming threads.\n";
 
-      threads.resume();
+      //threads.resume();
 
-      std::cout << "Printing thread dump.\n";
-
-      printThreadDump(jvmti, jni, &std::cout, threads.current);
       std::cout << "\n\n";
-    } exitAgentMonitor(jvmti);
-    kill(getpid(), SIGKILL);
+ //   } exitAgentMonitor(jvmti);
 
+    std::cerr << "killing current process\n";
+    kill(getpid(), gdata->signal);
 }
 
-/* Called by the JVM to load the module. */
-JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
-  jint rc;
-  jvmtiError err;
-  jvmtiCapabilities capabilities;
-  jvmtiEventCallbacks callbacks;
-  jvmtiEnv *jvmti;
+/* Called when memory is exhausted. */
+static void JNICALL resourceExhausted(
+    jvmtiEnv *jvmti, JNIEnv* jni, jint flags, const void* reserved, const char* description) {
+    std::cerr << "ResourceExhausted!\n";
+    time_t evaluated = time(NULL)/gdata->timeThreshold;
+    if (currentTimestamp == evaluated) {
+        count++;
+        if (count > gdata->countThreshold) {
+            thresholdReached(jvmti, jni);
+        }
+    }
+    else {
+        count=1;
+        currentTimestamp = evaluated;
+    }
+}
 
+void setAnalyzeClasses(char *options) {
   /* Build list of filter classes. */
   if (options && options[0]) {
     int len = strlen(options);
-    int commaCount = 0;
+    int separatorCount = 0;
     gdata->optionsCopy = strdup(options);
     for (int i = 0; i < len; i++) {
-      if (options[i] == ',') {
-        commaCount += 1;
+      if (options[i] == '+') {
+        separatorCount += 1;
       }
     }
-    gdata->retainedSizeClassCount = commaCount + 1;
-    if (commaCount == 0) {
+    gdata->retainedSizeClassCount = separatorCount + 1;
+    if (separatorCount == 0) {
       gdata->retainedSizeClasses = &gdata->optionsCopy;
     } else {
       gdata->retainedSizeClasses = (char **) calloc(sizeof(char *), gdata->retainedSizeClassCount);
       char *base = gdata->optionsCopy;
       int j = 0;
       for (int i = 0; i < len; i++) {
-        if (gdata->optionsCopy[i] == ',') {
+        if (gdata->optionsCopy[i] == '+') {
           gdata->optionsCopy[i] = 0;
           gdata->retainedSizeClasses[j] = base;
           base = gdata->optionsCopy + (i + 1);
@@ -118,8 +150,54 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   } else {
     gdata->retainedSizeClassCount = 0;
   }
+}
+
+
+void setParameters(char *options) {
+   char *subopts;
+   char *value;
+
+   //sets defaults
+   gdata->countThreshold = 0;
+   gdata->timeThreshold = 1;
+
+   if (NULL == options)
+       return;
+
+   subopts = options;
+   while (*subopts != '\0')
+      switch (getsubopt (&subopts, tokens, &value)) {
+std::cout << value;
+         case COUNT_OPT:
+            if (value == NULL)
+               abort ();
+            gdata->countThreshold = atoi (value);
+            break;
+         case TIME_OPT:
+            if (value == NULL)
+               abort ();
+            gdata->timeThreshold = atoi (value);
+            break;
+         default:
+            /* Unknown suboption. */
+            std::cerr << "Unknown suboption '" << value  << "\n";
+            break;
+      }
+}
+
+
+/* Called by the JVM to load the module. */
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
+  jint rc;
+  jvmtiError err;
+  jvmtiCapabilities capabilities;
+  jvmtiEventCallbacks callbacks;
+  jvmtiEnv *jvmti;
+
+  gdata->signal = SIGKILL;
 
   std::cout << "Initializing polarbear.\n\n";
+  if (1 == 1) setParameters(options);
 
   if (gdata->retainedSizeClassCount) {
     std::cout << "Performing retained size analysis for" << gdata->retainedSizeClassCount << " classes:\n";
@@ -134,7 +212,7 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   rc = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
   if (rc != JNI_OK) {
     std::cerr << "ERROR: Unable to create jvmtiEnv, GetEnv failed, error=" << rc << "\n";
-    return -1;
+    return JNI_ERR;
   }
   CHECK_FOR_NULL(jvmti);
 
@@ -156,7 +234,7 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   CHECK(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks)));
   CHECK(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_RESOURCE_EXHAUSTED, NULL));
 
-  return 0;
+  return JNI_OK;
 }
 
 /* Agent_OnUnload() is called last */

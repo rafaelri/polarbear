@@ -109,7 +109,7 @@ static void JNICALL printFrame(jvmtiEnv* jvmti, jvmtiFrameInfo frame, std::ostre
 
 
 /* Prints a thread dump. */
-void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, std::ostream *out, jthread current) {
+void JNICALL printThreadDump(jvmtiEnv *jvmti, std::ostream *out) {
   jvmtiStackInfo *stack_info;
   jint thread_count;
   int ti;
@@ -149,9 +149,6 @@ void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, std::ostream *out, jt
 
     jvmti->GetThreadInfo(thread, &threadInfo);
     (*out) << "#" << ti + 1 << " - " << threadInfo.name <<" - " << threadState;
-    if (thread == current || jni->IsSameObject(thread, current)) {
-      (*out) << " - [OOM thrower]";
-    }
     (*out) << "\n";
     deallocate(jvmti, threadInfo.name);
 
@@ -166,26 +163,14 @@ void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, std::ostream *out, jt
 }
 
 
-ThreadSuspension::ThreadSuspension(jvmtiEnv *_jvmti, JNIEnv *jni) : jvmti(_jvmti) {
-  CHECK(_jvmti->GetCurrentThread(&this->current));
-
-  jint threadCount;
-  CHECK(_jvmti->GetAllThreads(&threadCount, &this->threads));
-
-  int j = 0;
-  for (int i = 0; i < threadCount; i++) {
-    if (!jni->IsSameObject(this->threads[i], this->current)) {
-      this->threads[j] = this->threads[i];
-      j++;
-    }
-  }
-
-  this->errors = (jvmtiError *)calloc(sizeof(jvmtiError), j);
-  CHECK(_jvmti->SuspendThreadList(j, threads, this->errors));
-  this->changedCount = j;
+ThreadSuspension::ThreadSuspension(jvmtiEnv *_jvmti) : jvmti(_jvmti) {
+  CHECK(_jvmti->GetAllThreads(&this->threadCount, &this->threads));
 }
 
 
+void ThreadSuspension::suspend() {
+  CHECK(this->jvmti->SuspendThreadList(this->threadCount, threads, this->errors));
+}
 void ThreadSuspension::resume() {
   int j;
   if (this->threads) {

@@ -361,9 +361,9 @@ void JNICALL printHistogram(jvmtiEnv *jvmti, std::ostream *out, bool includeRefe
     qsort(classes.details, classes.count, sizeof(ClassDetails), &compareDetails);
 
     /* Print out sorted table */
-    (*out) << "Heap View, Total of" << gdata->totalCount << "objects found.\n\n";
+    (*out) << "Heap View, Total of " << gdata->totalCount << " objects found.\n\n";
 
-    (*out) << "Space      Count      Retained   Class Signature\n";
+    (*out) << "Space Count Retained Class Signature\n";
     (*out) << "---------- ---------- ---------- ----------------------\n";
 
     for (i = 0 ; i < classes.count ; i++) {

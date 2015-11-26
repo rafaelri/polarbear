@@ -45,7 +45,7 @@
 #include "jvmti.h"
 #include "jni.h"
 
-void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, std::ostream *out, jthread current);
+void JNICALL printThreadDump(jvmtiEnv *jvmti, std::ostream *out);
 
 struct ThreadSuspension {
   jvmtiEnv* jvmti;
@@ -53,10 +53,12 @@ struct ThreadSuspension {
   jthread *threads;
   jvmtiError *errors;
   int changedCount;
+  int threadCount;
 
-  ThreadSuspension(jvmtiEnv *_jvmti, JNIEnv *jni);
+  ThreadSuspension(jvmtiEnv *_jvmti);
 
   void resume();
+  void suspend();
 
   ~ThreadSuspension();
 };

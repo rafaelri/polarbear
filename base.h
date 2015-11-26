@@ -55,9 +55,9 @@ typedef struct {
   char *optionsCopy;
   int retainedSizeClassCount;
   char **retainedSizeClasses;
-
-  int shellSocket;
-  int activeShellSocket;
+  int timeThreshold;
+  int countThreshold;
+  int signal;
 } GlobalData;
 
 extern GlobalData *gdata;
