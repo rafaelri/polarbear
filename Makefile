@@ -1,6 +1,6 @@
 # Source lists
 LIBNAME=outOfMemory
-SOURCES=outOfMemory.cc base.cc threads.cc agentthread.cc shell.cc io.cc memory.cc
+SOURCES=outOfMemory.cc base.cc threads.cc memory.cc
 
 LINK.cxx    = $(CXX) $(MY_CFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
@@ -49,7 +49,7 @@ ifeq ($(OSNAME), linux)
     OBJECTS=$(SOURCES:%.cc=%.o)
     # Library name and options needed to build it
     LIBRARY=lib$(LIBNAME).so
-    LDFLAGS=-Wl,-soname=$(LIBRARY) -static-libgcc -mimpure-text
+    LDFLAGS=-Wl,-soname=$(LIBRARY) -static-libgcc 
     # Libraries we are dependent on
     LIBRARIES=-lc
     # Building a shared library

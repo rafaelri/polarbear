@@ -42,16 +42,14 @@
 #ifndef POLARBEAR_MEMORY_H
 #define POLARBEAR_MEMORY_H
 
-
+#include <iostream>
 #include "jni.h"
 #include "jvmti.h"
 
-#include "io.h"
+void printHistogram(jvmtiEnv *jvmti, std::ostream *out, bool includeReferrers);
 
-void printHistogram(jvmtiEnv *jvmti, Output *out, bool includeReferrers);
+void printClassStats(jvmtiEnv *jvmti, const char *signature, std::ostream *out, bool retainedSize);
 
-void printClassStats(jvmtiEnv *jvmti, const char *signature, Output *out, bool retainedSize);
-
-void printReferrers(jvmtiEnv *jvmti, const char *signature, Output *out);
+void printReferrers(jvmtiEnv *jvmti, const char *signature, std::ostream *out);
 
 #endif

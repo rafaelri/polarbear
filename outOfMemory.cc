@@ -37,84 +37,48 @@
  * for use in the design, construction, operation or maintenance of any
  * nuclear facility.
  */
-
+#include <iostream>
+#include <signal.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "jni.h"
 #include "jvmti.h"
 
-#include "agentthread.h"
 #include "base.h"
-#include "io.h"
 #include "memory.h"
-#include "shell.h"
 #include "threads.h"
 
 
 /* Called when memory is exhausted. */
 static void JNICALL resourceExhausted(
     jvmtiEnv *jvmti, JNIEnv* jni, jint flags, const void* reserved, const char* description) {
-  if (flags & 0x0003) {
     enterAgentMonitor(jvmti); {
-      FILE * out = fopen("/tmp/oom.log", "a");
-      FileOutput output(out);
+      std::cout << "About to throw an OutOfMemory error.\n";
 
-      output.printf("About to throw an OutOfMemory error.\n");
-
-      output.printf("Suspending all threads except the current one.\n");
+      std::cout << "Suspending all threads except the current one.\n";
 
       ThreadSuspension threads(jvmti, jni);
 
-      output.printf("Printing a heap histogram.\n");
+      std::cout << "Printing a heap histogram.\n";
 
-      printHistogram(jvmti, &output, true);
+      printHistogram(jvmti, &(std::cout), true);
 
-      output.printf("Resuming threads.\n");
+      std::cout << "Resuming threads.\n";
 
       threads.resume();
 
-      output.printf("Printing thread dump.\n");
+      std::cout << "Printing thread dump.\n";
 
-      if (!gdata->vmDeathCalled) {
-        printThreadDump(jvmti, jni, &output, threads.current);
-      }
-      output.printf("\n\n");
-      fclose(out);
+      printThreadDump(jvmti, jni, &std::cout, threads.current);
+      std::cout << "\n\n";
     } exitAgentMonitor(jvmti);
-  }
+    kill(getpid(), SIGKILL);
+
 }
-
-
-/* Callback to init the module. */
-static void JNICALL vmInit(jvmtiEnv *jvmti, JNIEnv *env, jthread thread)
-{
-  enterAgentMonitor(jvmti); {
-    jvmtiError err;
-
-    createAgentThread(jvmti, env, shellServer, NULL);
-
-    CHECK(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_DATA_DUMP_REQUEST, NULL));
-  } exitAgentMonitor(jvmti);
-}
-
-
-/* Callback for JVM death. */
-static void JNICALL vmDeath(jvmtiEnv *jvmti, JNIEnv *env) {
-  jvmtiError          err;
-
-  /* Disable events */
-  enterAgentMonitor(jvmti); {
-    CHECK(jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_RESOURCE_EXHAUSTED, NULL));
-
-    closeShellServer();
-
-    gdata->vmDeathCalled = JNI_TRUE;
-  } exitAgentMonitor(jvmti);
-}
-
 
 /* Called by the JVM to load the module. */
 JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
@@ -123,7 +87,6 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   jvmtiCapabilities capabilities;
   jvmtiEventCallbacks callbacks;
   jvmtiEnv *jvmti;
-  FILE *log;
 
   /* Build list of filter classes. */
   if (options && options[0]) {
@@ -156,22 +119,21 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
     gdata->retainedSizeClassCount = 0;
   }
 
-  log = fopen("/tmp/oom.log", "a");
-  fprintf(log, "Initializing polarbear.\n\n");
+  std::cout << "Initializing polarbear.\n\n";
 
   if (gdata->retainedSizeClassCount) {
-    fprintf(log, "Performing retained size analysis for %d classes:\n", gdata->retainedSizeClassCount);
+    std::cout << "Performing retained size analysis for" << gdata->retainedSizeClassCount << " classes:\n";
     for (int i = 0; i < gdata->retainedSizeClassCount; i++) {
-      fprintf(log, "%s\n", gdata->retainedSizeClasses[i]);
+      std::cout << gdata->retainedSizeClasses[i] << "\n";
     }
-    fprintf(log, "\n");
+    std::cout << "\n";
   }
 
   /* Get JVMTI environment */
   jvmti = NULL;
   rc = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
   if (rc != JNI_OK) {
-    fprintf(stderr, "ERROR: Unable to create jvmtiEnv, GetEnv failed, error=%d\n", rc);
+    std::cerr << "ERROR: Unable to create jvmtiEnv, GetEnv failed, error=" << rc << "\n";
     return -1;
   }
   CHECK_FOR_NULL(jvmti);
@@ -190,15 +152,9 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
 
   /* Set callbacks and enable event notifications */
   memset(&callbacks, 0, sizeof(callbacks));
-  callbacks.VMInit = &vmInit;
-  callbacks.VMDeath = &vmDeath;
   callbacks.ResourceExhausted = resourceExhausted;
   CHECK(jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks)));
-  CHECK(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL));
-  CHECK(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_DEATH, NULL));
   CHECK(jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_RESOURCE_EXHAUSTED, NULL));
-
-  fclose(log);
 
   return 0;
 }

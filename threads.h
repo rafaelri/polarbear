@@ -41,13 +41,11 @@
 #ifndef POLARBEAR_THREADS_H
 #define POLARBEAR_THREADS_H
 
-
+#include <iostream>
 #include "jvmti.h"
 #include "jni.h"
 
-#include "io.h"
-
-void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, Output *out, jthread current);
+void JNICALL printThreadDump(jvmtiEnv *jvmti, JNIEnv *jni, std::ostream *out, jthread current);
 
 struct ThreadSuspension {
   jvmtiEnv* jvmti;
