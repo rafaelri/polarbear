@@ -53,18 +53,20 @@
 
 enum {
     TIME_OPT = 0,
-    COUNT_OPT = 1,
-    DUMPHEAP_OPT = 3,
-    DUMPTHREADS_OPT = 4,
-    ANALYZECLASSES_OPT = 5
+    COUNT_OPT,
+    DUMPHEAP_OPT,
+    DUMPTHREADS_OPT,
+    ANALYZECLASSES_OPT,
+    THE_END
 };
  
 char *tokens[] = {
-    "time",
-    "count",
-    "dumpHeap",
-    "dumpThreads",
-    "analyzeClasses"
+    [TIME_OPT] = "time",
+    [COUNT_OPT] ="count",
+    [DUMPHEAP_OPT] = "dumpHeap",
+    [DUMPTHREADS_OPT] = "dumpThreads",
+    [ANALYZECLASSES_OPT] = "analyzeClasses",
+    [THE_END] = NULL
 };
 
 
@@ -163,8 +165,8 @@ void setParameters(char *options) {
 
    if (NULL == options)
        return;
-
-   subopts = options;
+std::cout << options;
+   subopts = strdup(options);
    while (*subopts != '\0')
       switch (getsubopt (&subopts, tokens, &value)) {
 std::cout << value;
@@ -197,7 +199,7 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   gdata->signal = SIGKILL;
 
   std::cout << "Initializing polarbear.\n\n";
-  if (1 == 1) setParameters(options);
+  setParameters(options);
 
   if (gdata->retainedSizeClassCount) {
     std::cout << "Performing retained size analysis for" << gdata->retainedSizeClassCount << " classes:\n";
