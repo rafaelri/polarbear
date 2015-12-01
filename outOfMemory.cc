@@ -54,7 +54,7 @@
 enum {
     TIME_OPT = 0,
     COUNT_OPT,
-    DUMPHEAP_OPT,
+    PRINTHEAPHISTO_OPT,
     DUMPTHREADS_OPT,
     ANALYZECLASSES_OPT,
     THE_END
@@ -63,7 +63,7 @@ enum {
 char *tokens[] = {
     [TIME_OPT] = "time",
     [COUNT_OPT] ="count",
-    [DUMPHEAP_OPT] = "dumpHeap",
+    [PRINTHEAPHISTO_OPT] = "printHeapHisto",
     [DUMPTHREADS_OPT] = "dumpThreads",
     [ANALYZECLASSES_OPT] = "analyzeClasses",
     [THE_END] = NULL
@@ -75,31 +75,18 @@ static time_t currentTimestamp;
 static int count;
 
 static void thresholdReached(jvmtiEnv *jvmti, JNIEnv* jni) {
-//    enterAgentMonitor(jvmti); {
-      std::cout << "About to throw an OutOfMemory error.\n";
+	
+    if (gdata->dumpThreads) {
+       std::cout << "Printing thread dump.\n";
+       printThreadDump(jvmti, &std::cout);
+    }
 
-      std::cout << "Printing thread dump.\n";
+    if (gdata->printHeapHistogram) {
+       std::cout << "Printing a heap histogram.\n";
+       printHistogram(jvmti, &(std::cout), true);
+    }
 
-//      ThreadSuspension threads(jvmti);
-
-      printThreadDump(jvmti, &std::cout);
-
-      std::cout << "Suspending all threads except the current one.\n";
-
-      //threads.suspend();
-
-
-      std::cout << "Printing a heap histogram.\n";
-
-      printHistogram(jvmti, &(std::cout), true);
-
-      std::cout << "Resuming threads.\n";
-
-      //threads.resume();
-
-      std::cout << "\n\n";
- //   } exitAgentMonitor(jvmti);
-
+    std::cout << "\n\n";
     std::cerr << "killing current process\n";
     kill(getpid(), gdata->signal);
 }
@@ -128,7 +115,7 @@ void setAnalyzeClasses(char *options) {
     int separatorCount = 0;
     gdata->optionsCopy = strdup(options);
     for (int i = 0; i < len; i++) {
-      if (options[i] == '+') {
+      if (options[i] == ANALYZE_CLASS_SEPARATOR) {
         separatorCount += 1;
       }
     }
@@ -140,7 +127,7 @@ void setAnalyzeClasses(char *options) {
       char *base = gdata->optionsCopy;
       int j = 0;
       for (int i = 0; i < len; i++) {
-        if (gdata->optionsCopy[i] == '+') {
+        if (gdata->optionsCopy[i] == ANALYZE_CLASS_SEPARATOR) {
           gdata->optionsCopy[i] = 0;
           gdata->retainedSizeClasses[j] = base;
           base = gdata->optionsCopy + (i + 1);
@@ -154,14 +141,19 @@ void setAnalyzeClasses(char *options) {
   }
 }
 
+void setDefaults() {
+   //sets defaults
+   gdata->countThreshold = 0;
+   gdata->timeThreshold = 1;
+   gdata->dumpThreads = 0;
+   gdata->printHeapHistogram = 0;
+   gdata->signal = SIGKILL;
+}
 
 void setParameters(char *options) {
    char *subopts;
    char *value;
 
-   //sets defaults
-   gdata->countThreshold = 0;
-   gdata->timeThreshold = 1;
 
    if (NULL == options)
        return;
@@ -180,6 +172,21 @@ std::cout << value;
                abort ();
             gdata->timeThreshold = atoi (value);
             break;
+         case PRINTHEAPHISTO_OPT:
+            if (value == NULL)
+               abort ();
+            gdata->printHeapHistogram = atoi (value);
+            break;
+         case DUMPTHREADS_OPT:
+            if (value == NULL)
+               abort ();
+            gdata->dumpThreads = atoi (value);
+            break;
+         case ANALYZECLASSES_OPT:
+            if (value == NULL)
+               abort ();
+            setAnalyzeClasses(value);
+            break;
          default:
             /* Unknown suboption. */
             std::cerr << "Unknown suboption '" << value  << "\n";
@@ -196,9 +203,9 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
   jvmtiEnv *jvmti;
 
-  gdata->signal = SIGKILL;
 
   std::cout << "Initializing polarbear.\n\n";
+  setDefaults();
   setParameters(options);
 
   if (gdata->retainedSizeClassCount) {

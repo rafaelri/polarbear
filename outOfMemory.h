@@ -1,6 +1,8 @@
 #include "jni.h"
 #include "jvmti.h"
 
+#define ANALYZE_CLASS_SEPARATOR ':'
+
 static void JNICALL resourceExhausted(
     jvmtiEnv *jvmti, JNIEnv* jni, jint flags, const void* reserved, const char* description);
 

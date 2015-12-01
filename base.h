@@ -49,7 +49,6 @@
 typedef struct {
   jboolean vmDeathCalled;
   jboolean dumpInProgress;
-  jrawMonitorID lock;
   int totalCount;
 
   char *optionsCopy;
@@ -58,6 +57,8 @@ typedef struct {
   int timeThreshold;
   int countThreshold;
   int signal;
+  int dumpThreads;
+  int printHeapHistogram;
 } GlobalData;
 
 extern GlobalData *gdata;

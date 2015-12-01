@@ -121,7 +121,7 @@ clean:
 
 # Simple tester
 test: all Test.class
-	LD_LIBRARY_PATH=`pwd` $(J2SDK)/bin/java -Xms1m -Xmx1m -agentlib:$(LIBNAME)=time=10,count=1 JvmKillTestThreads
+	LD_LIBRARY_PATH=`pwd` $(J2SDK)/bin/java -Xms1m -Xmx1m -agentlib:$(LIBNAME)=time=10,count=1,dumpThreads=0,printHeapHisto=1,analyzeClasses=JvmKillTestThreads JvmKillTestThreads
 
 # Compilation rule only needed on Windows
 ifeq ($(OSNAME), win32)

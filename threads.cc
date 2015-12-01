@@ -161,30 +161,3 @@ void JNICALL printThreadDump(jvmtiEnv *jvmti, std::ostream *out) {
   /* this one Deallocate call frees all data allocated by GetAllStackTraces */
   deallocate(jvmti, stack_info);
 }
-
-
-ThreadSuspension::ThreadSuspension(jvmtiEnv *_jvmti) : jvmti(_jvmti) {
-  CHECK(_jvmti->GetAllThreads(&this->threadCount, &this->threads));
-}
-
-
-void ThreadSuspension::suspend() {
-  CHECK(this->jvmti->SuspendThreadList(this->threadCount, threads, this->errors));
-}
-void ThreadSuspension::resume() {
-  int j;
-  if (this->threads) {
-    for (int i = 0; i < this->changedCount; i++) {
-      if (!this->errors[i]) {
-        CHECK(this->jvmti->ResumeThread(threads[i]));
-      }
-    }
-    free(this->errors);
-    deallocate(this->jvmti, this->threads);
-    this->threads = 0;
-  }
-}
-
-ThreadSuspension::~ThreadSuspension() {
-  this->resume();
-}

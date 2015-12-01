@@ -47,21 +47,4 @@
 
 void JNICALL printThreadDump(jvmtiEnv *jvmti, std::ostream *out);
 
-struct ThreadSuspension {
-  jvmtiEnv* jvmti;
-  jthread current;
-  jthread *threads;
-  jvmtiError *errors;
-  int changedCount;
-  int threadCount;
-
-  ThreadSuspension(jvmtiEnv *_jvmti);
-
-  void resume();
-  void suspend();
-
-  ~ThreadSuspension();
-};
-
-
 #endif
