@@ -102,7 +102,7 @@ ifeq ($(OSNAME), win32)
 endif
 
 # Common -I options
-CXXFLAGS += -I.
+CXXFLAGS += -std=gnu++11 -I.
 CXXFLAGS += -I$(J2SDK)/include -I$(J2SDK)/include/$(OSNAME)
 
 %.class: %.java

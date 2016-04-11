@@ -38,6 +38,7 @@
  * nuclear facility.
  */
 #include <iostream>
+#include <mutex>
 #include <signal.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -73,6 +74,7 @@ char *tokens[] = {
 
 static time_t currentTimestamp;
 static int count;
+static std::mutex re_mutex;
 
 static void thresholdReached(jvmtiEnv *jvmti, JNIEnv* jni) {
 	
@@ -94,6 +96,7 @@ static void thresholdReached(jvmtiEnv *jvmti, JNIEnv* jni) {
 /* Called when memory is exhausted. */
 static void JNICALL resourceExhausted(
     jvmtiEnv *jvmti, JNIEnv* jni, jint flags, const void* reserved, const char* description) {
+    std::lock_guard<std::mutex> lock(re_mutex);
     std::cerr << "ResourceExhausted!\n";
     time_t evaluated = time(NULL)/gdata->timeThreshold;
     if (currentTimestamp == evaluated) {
@@ -233,9 +236,6 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
   capabilities.can_get_line_numbers = 1;
   capabilities.can_suspend = 1;
   CHECK(jvmti->AddCapabilities(&capabilities));
-
-  /* Create the raw monitor */
-  CHECK(jvmti->CreateRawMonitor("agent lock", &(gdata->lock)));
 
   /* Set callbacks and enable event notifications */
   memset(&callbacks, 0, sizeof(callbacks));
